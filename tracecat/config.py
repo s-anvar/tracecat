@@ -75,7 +75,7 @@ TRACECAT__DB_POOL_RECYCLE = int(os.environ.get("TRACECAT__DB_POOL_RECYCLE", 1800
 # Infrastructure config
 TRACECAT__AUTH_TYPES = {
     AuthType(t.lower())
-    for t in os.environ.get("TRACECAT__AUTH_TYPES", "basic,google_oauth").split(",")
+    for t in os.environ.get("TRACECAT__AUTH_TYPES", "basic,google_oauth,oidc").split(",")
 }
 """The set of allowed auth types on the platform. If an auth type is not in this set,
 it cannot be enabled."""
@@ -100,7 +100,7 @@ TRACECAT__AUTH_SUPERADMIN_EMAIL = os.environ.get("TRACECAT__AUTH_SUPERADMIN_EMAI
 """Email address that is allowed to become the first superuser. If not set, the first user logic is disabled for security."""
 
 # OAuth Login Flow
-# Used for both Google OAuth2 and OIDC flows
+# Google OAuth2 client credentials
 OAUTH_CLIENT_ID = (
     os.environ.get("OAUTH_CLIENT_ID") or os.environ.get("GOOGLE_OAUTH_CLIENT_ID") or ""
 )
@@ -109,6 +109,11 @@ OAUTH_CLIENT_SECRET = (
     or os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET")
     or ""
 )
+
+# OIDC client credentials
+OIDC_CLIENT_ID = os.environ.get("OIDC_CLIENT_ID", "")
+OIDC_CLIENT_SECRET = os.environ.get("OIDC_CLIENT_SECRET", "")
+OIDC_DISCOVERY_URL = os.environ.get("OIDC_DISCOVERY_URL")
 USER_AUTH_SECRET = os.environ.get("USER_AUTH_SECRET", "")
 
 # SAML SSO

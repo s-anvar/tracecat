@@ -15,6 +15,8 @@ from tracecat.settings.models import (
     AuthSettingsUpdate,
     GitSettingsRead,
     GitSettingsUpdate,
+    OIDCSettingsRead,
+    OIDCSettingsUpdate,
     OAuthSettingsRead,
     OAuthSettingsUpdate,
     SAMLSettingsRead,
@@ -171,6 +173,32 @@ async def update_oauth_settings(
     if not params.oauth_google_enabled:
         await check_other_auth_enabled(service, AuthType.GOOGLE_OAUTH)
     await service.update_oauth_settings(params)
+
+
+@router.get("/oidc", response_model=OIDCSettingsRead)
+async def get_oidc_settings(
+    *,
+    role: OrgAdminUserRole,
+    session: AsyncDBSession,
+) -> OIDCSettingsRead:
+    service = SettingsService(session, role)
+    keys = OIDCSettingsRead.keys()
+    settings = await service.list_org_settings(keys=keys)
+    settings_dict = {setting.key: service.get_value(setting) for setting in settings}
+    return OIDCSettingsRead(**settings_dict)
+
+
+@router.patch("/oidc", status_code=status.HTTP_204_NO_CONTENT)
+async def update_oidc_settings(
+    *,
+    role: OrgAdminUserRole,
+    session: AsyncDBSession,
+    params: OIDCSettingsUpdate,
+) -> None:
+    service = SettingsService(session, role)
+    if not params.oidc_enabled:
+        await check_other_auth_enabled(service, AuthType.OIDC)
+    await service.update_oidc_settings(params)
 
 
 @router.get("/app", response_model=AppSettingsRead)
