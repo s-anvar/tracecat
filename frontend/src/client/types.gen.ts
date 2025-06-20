@@ -3422,27 +3422,6 @@ export type SettingsUpdateOauthSettingsData = {
 
 export type SettingsUpdateOauthSettingsResponse = void
 
-export type OIDCSettingsRead = {
-  oidc_enabled: boolean
-  oidc_discovery_url?: string | null
-}
-
-export type OIDCSettingsUpdate = {
-  /**
-   * Whether OIDC is enabled.
-   */
-  oidc_enabled?: boolean
-  oidc_discovery_url?: string | null
-}
-
-export type SettingsGetOidcSettingsResponse = OIDCSettingsRead
-
-export type SettingsUpdateOidcSettingsData = {
-  requestBody: OIDCSettingsUpdate
-}
-
-export type SettingsUpdateOidcSettingsResponse = void
-
 export type SettingsGetAppSettingsResponse = AppSettingsRead
 
 export type SettingsUpdateAppSettingsData = {

@@ -3522,41 +3522,6 @@ export const $OAuthSettingsUpdate = {
   description: "Settings for OAuth authentication.",
 } as const
 
-export const $OIDCSettingsRead = {
-  properties: {
-    oidc_enabled: {
-      type: "boolean",
-      title: "Oidc Enabled",
-    },
-    oidc_discovery_url: {
-      anyOf: [{ type: "string" }, { type: "null" }],
-      title: "Oidc Discovery Url",
-    },
-  },
-  type: "object",
-  required: ["oidc_enabled"],
-  title: "OIDCSettingsRead",
-  description: "Settings for OpenID Connect authentication.",
-} as const
-
-export const $OIDCSettingsUpdate = {
-  properties: {
-    oidc_enabled: {
-      type: "boolean",
-      title: "Oidc Enabled",
-      description: "Whether OIDC is enabled.",
-      default: false,
-    },
-    oidc_discovery_url: {
-      anyOf: [{ type: "string" }, { type: "null" }],
-      title: "Oidc Discovery Url",
-    },
-  },
-  type: "object",
-  title: "OIDCSettingsUpdate",
-  description: "Settings for OpenID Connect authentication.",
-} as const
-
 export const $OrgMemberRead = {
   properties: {
     user_id: {

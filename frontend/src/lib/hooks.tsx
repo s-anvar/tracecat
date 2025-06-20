@@ -42,7 +42,6 @@ import {
   foldersUpdateFolder,
   GitSettingsRead,
   OAuthSettingsRead,
-  OIDCSettingsRead,
   organizationDeleteOrgMember,
   OrganizationDeleteOrgMemberData,
   organizationDeleteSession,
@@ -95,7 +94,6 @@ import {
   settingsGetAuthSettings,
   settingsGetGitSettings,
   settingsGetOauthSettings,
-  settingsGetOidcSettings,
   settingsGetSamlSettings,
   settingsUpdateAppSettings,
   SettingsUpdateAppSettingsData,
@@ -105,8 +103,6 @@ import {
   SettingsUpdateGitSettingsData,
   settingsUpdateOauthSettings,
   SettingsUpdateOauthSettingsData,
-  settingsUpdateOidcSettings,
-  SettingsUpdateOidcSettingsData,
   settingsUpdateSamlSettings,
   SettingsUpdateSamlSettingsData,
   TableRead,
@@ -2052,60 +2048,6 @@ export function useOrgOAuthSettings() {
     updateOAuthSettings,
     updateOAuthSettingsIsPending,
     updateOAuthSettingsError,
-  }
-}
-
-export function useOrgOidcSettings() {
-  const queryClient = useQueryClient()
-
-  const {
-    data: oidcSettings,
-    isLoading: oidcSettingsIsLoading,
-    error: oidcSettingsError,
-  } = useQuery<OIDCSettingsRead>({
-    queryKey: ["org-oidc-settings"],
-    queryFn: async () => await settingsGetOidcSettings(),
-  })
-
-  const {
-    mutateAsync: updateOidcSettings,
-    isPending: updateOidcSettingsIsPending,
-    error: updateOidcSettingsError,
-  } = useMutation({
-    mutationFn: async (params: SettingsUpdateOidcSettingsData) =>
-      await settingsUpdateOidcSettings(params),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["org-oidc-settings"] })
-      toast({
-        title: "Updated OIDC settings",
-        description: "OIDC settings updated successfully.",
-      })
-    },
-    onError: (error: TracecatApiError) => {
-      switch (error.status) {
-        case 403:
-          toast({
-            title: "Forbidden",
-            description: "You cannot perform this action",
-          })
-          break
-        default:
-          console.error("Failed to update OIDC settings", error)
-          toast({
-            title: "Failed to update OIDC settings",
-            description: `An error occurred while updating the OIDC settings: ${error.body.detail}`,
-          })
-      }
-    },
-  })
-
-  return {
-    oidcSettings,
-    oidcSettingsIsLoading,
-    oidcSettingsError,
-    updateOidcSettings,
-    updateOidcSettingsIsPending,
-    updateOidcSettingsError,
   }
 }
 

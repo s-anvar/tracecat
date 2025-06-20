@@ -23,7 +23,6 @@ from tracecat.settings.models import (
     AuthSettingsUpdate,
     BaseSettingsGroup,
     GitSettingsUpdate,
-    OIDCSettingsUpdate,
     OAuthSettingsUpdate,
     SAMLSettingsUpdate,
     SettingCreate,
@@ -41,7 +40,6 @@ class SettingsService(BaseService):
         SAMLSettingsUpdate,
         AuthSettingsUpdate,
         OAuthSettingsUpdate,
-        OIDCSettingsUpdate,
         AppSettingsUpdate,
     ]
     """The set of settings groups that are managed by the service."""
@@ -263,11 +261,6 @@ class SettingsService(BaseService):
         await self._update_grouped_settings(oauth_settings, params)
 
     @require_access_level(AccessLevel.ADMIN)
-    async def update_oidc_settings(self, params: OIDCSettingsUpdate) -> None:
-        oidc_settings = await self.list_org_settings(keys=OIDCSettingsUpdate.keys())
-        await self._update_grouped_settings(oidc_settings, params)
-
-    @require_access_level(AccessLevel.ADMIN)
     async def update_app_settings(self, params: AppSettingsUpdate) -> None:
         app_settings = await self.list_org_settings(keys=AppSettingsUpdate.keys())
         await self._update_grouped_settings(app_settings, params)
@@ -345,7 +338,6 @@ def get_setting_override(key: str) -> Any | None:
         "saml_enabled",
         "oauth_google_enabled",
         "auth_basic_enabled",
-        "oidc_enabled",
     }
 
     if key not in allowed_override_keys:
