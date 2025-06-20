@@ -1,11 +1,29 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, status
+import jwt
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
+from fastapi_users import models
+from fastapi_users.authentication import AuthenticationBackend, Strategy
+from fastapi_users.exceptions import UserAlreadyExists
+from fastapi_users.jwt import SecretType
+from fastapi_users.manager import BaseUserManager, UserManagerDependency
+from fastapi_users.router.oauth import (
+    STATE_TOKEN_AUDIENCE,
+    ErrorCode,
+    ErrorModel,
+    OAuth2AuthorizeResponse,
+    decode_jwt,
+    generate_state_token,
+)
 from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.clients.openid import OpenID
+from httpx_oauth.integrations.fastapi import (
+    OAuth2AuthorizeCallback,
+    OAuth2AuthorizeCallbackError,
+)
 from pydantic import BaseModel
 from pydantic_core import to_jsonable_python
 from sqlalchemy.exc import IntegrityError
@@ -132,6 +150,148 @@ def fastapi_users_auth_exception_handler(request: Request, exc: FastAPIUsersExce
     return ORJSONResponse(status_code=status_code, content={"detail": msg})
 
 
+def get_oidc_oauth_router(
+    oauth_client: OpenID,
+    backend: AuthenticationBackend[models.UP, models.ID],
+    get_user_manager: UserManagerDependency[models.UP, models.ID],
+    state_secret: SecretType,
+    redirect_url: str,
+    associate_by_email: bool = True,
+    is_verified_by_default: bool = True,
+) -> APIRouter:
+    """OAuth router with custom error handling for OIDC."""
+
+    router = APIRouter(prefix="")
+    callback_route_name = f"oauth:{oauth_client.name}.{backend.name}.callback"
+    oauth2_authorize_callback = OAuth2AuthorizeCallback(
+        oauth_client,
+        redirect_url=redirect_url,
+    )
+
+    @router.get(
+        "/authorize",
+        name=f"oauth:{oauth_client.name}.{backend.name}.authorize",
+        response_model=OAuth2AuthorizeResponse,
+    )
+    async def authorize(
+        request: Request, scopes: list[str] = Query(None)
+    ) -> OAuth2AuthorizeResponse:
+        state_data: dict[str, str] = {}
+        state = generate_state_token(state_data, state_secret)
+        authorization_url = await oauth_client.get_authorization_url(
+            redirect_url,
+            state,
+            scopes,
+        )
+        return OAuth2AuthorizeResponse(authorization_url=authorization_url)
+
+    @router.get(
+        "/callback",
+        name=callback_route_name,
+        description="The response varies based on the authentication backend used.",
+        responses={
+            status.HTTP_400_BAD_REQUEST: {
+                "model": ErrorModel,
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "INVALID_STATE_TOKEN": {
+                                "summary": "Invalid state token.",
+                                "value": None,
+                            },
+                            ErrorCode.LOGIN_BAD_CREDENTIALS: {
+                                "summary": "User is inactive.",
+                                "value": {"detail": ErrorCode.LOGIN_BAD_CREDENTIALS},
+                            },
+                        }
+                    }
+                },
+            },
+        },
+    )
+    async def callback(
+        request: Request,
+        code: str | None = None,
+        code_verifier: str | None = None,
+        state: str | None = None,
+        error: str | None = None,
+        user_manager: BaseUserManager[models.UP, models.ID] = Depends(get_user_manager),
+        strategy: Strategy[models.UP, models.ID] = Depends(backend.get_strategy),
+    ):
+        try:
+            token, state_value = await oauth2_authorize_callback(
+                request=request,
+                code=code,
+                code_verifier=code_verifier,
+                state=state,
+                error=error,
+            )
+        except OAuth2AuthorizeCallbackError as e:
+            logger.error("OIDC token exchange failed", exc=e)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to complete OIDC login. Check provider configuration.",
+            ) from e
+        except Exception as e:  # pragma: no cover - unexpected errors
+            logger.error("OIDC token exchange unexpected error", exc=e)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to complete OIDC login. Check provider configuration.",
+            ) from e
+
+        try:
+            account_id, account_email = await oauth_client.get_id_email(
+                token["access_token"]
+            )
+        except Exception as e:
+            logger.error("OIDC provider user info retrieval failed", exc=e)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to complete OIDC login. Check provider configuration.",
+            ) from e
+
+        if account_email is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=ErrorCode.OAUTH_NOT_AVAILABLE_EMAIL,
+            )
+
+        try:
+            decode_jwt(state_value, state_secret, [STATE_TOKEN_AUDIENCE])
+        except jwt.DecodeError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = await user_manager.oauth_callback(
+                oauth_client.name,
+                token["access_token"],
+                account_id,
+                account_email,
+                token.get("expires_at"),
+                token.get("refresh_token"),
+                request,
+                associate_by_email=associate_by_email,
+                is_verified_by_default=is_verified_by_default,
+            )
+        except UserAlreadyExists:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=ErrorCode.OAUTH_USER_ALREADY_EXISTS,
+            )
+
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=ErrorCode.LOGIN_BAD_CREDENTIALS,
+            )
+
+        response = await backend.login(strategy, user)
+        await user_manager.on_after_login(user, request, response)
+        return response
+
+    return router
+
+
 def create_app(**kwargs) -> FastAPI:
     if config.TRACECAT__ALLOW_ORIGINS is not None:
         allow_origins = config.TRACECAT__ALLOW_ORIGINS.split(",")
@@ -244,13 +404,14 @@ def create_app(**kwargs) -> FastAPI:
         )
         oidc_redirect_url = f"{config.TRACECAT__PUBLIC_APP_URL}/auth/oidc/callback"
         app.include_router(
-            fastapi_users.get_oauth_router(
+            get_oidc_oauth_router(
                 oidc_client,
                 auth_backend,
+                fastapi_users.get_user_manager,
                 config.USER_AUTH_SECRET,
+                redirect_url=oidc_redirect_url,
                 associate_by_email=True,
                 is_verified_by_default=True,
-                redirect_url=oidc_redirect_url,
             ),
             prefix="/auth/oidc",
             tags=["auth"],
