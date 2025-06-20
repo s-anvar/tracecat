@@ -164,6 +164,7 @@ export const Icons = {
     </svg>
   ),
   saml: (props: IconProps) => <Building2Icon {...props} />,
+  oidc: (props: IconProps) => <ShieldPlus {...props} />,
 }
 
 export function getFlairSize(size: "sm" | "md" | "lg"): string {

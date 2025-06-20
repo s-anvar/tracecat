@@ -5,6 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 from httpx_oauth.clients.google import GoogleOAuth2
+from httpx_oauth.clients.openid import OpenID
 from pydantic import BaseModel
 from pydantic_core import to_jsonable_python
 from sqlalchemy.exc import IntegrityError
@@ -235,6 +236,26 @@ def create_app(**kwargs) -> FastAPI:
         tags=["auth"],
         dependencies=[require_auth_type_enabled(AuthType.GOOGLE_OAUTH)],
     )
+    if config.OIDC_DISCOVERY_URL:
+        oidc_client = OpenID(
+            client_id=config.OIDC_CLIENT_ID,
+            client_secret=config.OIDC_CLIENT_SECRET,
+            openid_configuration_endpoint=config.OIDC_DISCOVERY_URL,
+        )
+        oidc_redirect_url = f"{config.TRACECAT__PUBLIC_APP_URL}/auth/oidc/callback"
+        app.include_router(
+            fastapi_users.get_oauth_router(
+                oidc_client,
+                auth_backend,
+                config.USER_AUTH_SECRET,
+                associate_by_email=True,
+                is_verified_by_default=True,
+                redirect_url=oidc_redirect_url,
+            ),
+            prefix="/auth/oidc",
+            tags=["auth"],
+            dependencies=[require_auth_type_enabled(AuthType.OIDC)],
+        )
     app.include_router(
         saml_router,
         dependencies=[require_auth_type_enabled(AuthType.SAML)],
@@ -295,13 +316,19 @@ class AppInfo(BaseModel):
     auth_basic_enabled: bool
     oauth_google_enabled: bool
     saml_enabled: bool
+    oidc_enabled: bool
 
 
 @app.get("/info", include_in_schema=False)
 async def info(session: AsyncDBSession) -> AppInfo:
     """Non-sensitive information about the platform, for frontend configuration."""
 
-    keys = {"auth_basic_enabled", "oauth_google_enabled", "saml_enabled"}
+    keys = {
+        "auth_basic_enabled",
+        "oauth_google_enabled",
+        "saml_enabled",
+        "oidc_enabled",
+    }
 
     service = SettingsService(session, role=bootstrap_role())
     settings = await service.list_org_settings(keys=keys)
@@ -315,6 +342,7 @@ async def info(session: AsyncDBSession) -> AppInfo:
         auth_basic_enabled=keyvalues["auth_basic_enabled"],
         oauth_google_enabled=keyvalues["oauth_google_enabled"],
         saml_enabled=keyvalues["saml_enabled"],
+        oidc_enabled=keyvalues["oidc_enabled"],
     )
 
 

@@ -11,6 +11,7 @@ from tracecat.settings.constants import SENSITIVE_SETTINGS_KEYS
 from tracecat.settings.models import (
     AuthSettingsUpdate,
     GitSettingsUpdate,
+    OIDCSettingsUpdate,
     OAuthSettingsUpdate,
     SAMLSettingsUpdate,
     SettingCreate,
@@ -279,6 +280,22 @@ async def test_update_oauth_settings(
 
 
 @pytest.mark.anyio
+async def test_update_oidc_settings(
+    settings_service_with_defaults: SettingsService,
+) -> None:
+    """Test updating OIDC settings."""
+    service = settings_service_with_defaults
+
+    test_params = OIDCSettingsUpdate(oidc_enabled=True, oidc_discovery_url="https://idp.example.com/.well-known/openid-configuration")
+    await service.update_oidc_settings(test_params)
+
+    oidc_settings = await service.list_org_settings(keys=OIDCSettingsUpdate.keys())
+    settings_dict = {setting.key: service.get_value(setting) for setting in oidc_settings}
+    assert settings_dict["oidc_enabled"] is True
+    assert settings_dict["oidc_discovery_url"] == "https://idp.example.com/.well-known/openid-configuration"
+
+
+@pytest.mark.anyio
 async def test_get_setting_shorthand(
     settings_service: SettingsService,
     create_params: SettingCreate,
@@ -400,6 +417,7 @@ async def test_init_default_settings(
         ("saml_enabled", "true", "true"),
         ("auth_basic_enabled", "false", "false"),
         ("oauth_google_enabled", "1", "1"),
+        ("oidc_enabled", "1", "1"),
         ("unauthorized_setting", "true", None),
     ],
 )
@@ -420,6 +438,7 @@ def test_get_setting_override(
         ("saml_enabled", "true", True),
         ("auth_basic_enabled", "false", False),
         ("oauth_google_enabled", "1", True),
+        ("oidc_enabled", "1", True),
         ("unauthorized_setting", "true", None),
         ("saml_enabled", "some_string", "some_string"),
     ],
@@ -433,7 +452,7 @@ async def test_setting_with_override(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test get_setting with environment overrides."""
-    if key in {"saml_enabled", "auth_basic_enabled", "oauth_google_enabled"}:
+    if key in {"saml_enabled", "auth_basic_enabled", "oauth_google_enabled", "oidc_enabled"}:
         monkeypatch.setenv(f"TRACECAT__SETTING_OVERRIDE_{key.upper()}", env_value)
 
     # Test with both session and role
