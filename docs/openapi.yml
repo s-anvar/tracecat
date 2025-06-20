@@ -3047,6 +3047,45 @@ paths:
       security:
       - APIKeyCookie: []
       - APIKeyHeader: []
+  /settings/oidc:
+    get:
+      tags:
+      - settings
+      summary: Get Oidc Settings
+      operationId: settings-get_oidc_settings
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OIDCSettingsRead'
+      security:
+      - APIKeyCookie: []
+      - APIKeyHeader: []
+    patch:
+      tags:
+      - settings
+      summary: Update Oidc Settings
+      operationId: settings-update_oidc_settings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OIDCSettingsUpdate'
+        required: true
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - APIKeyCookie: []
+      - APIKeyHeader: []
   /settings/app:
     get:
       tags:
@@ -4827,6 +4866,99 @@ paths:
           description: Bad Request
         '422':
           description: Validation Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HTTPValidationError'
+  /auth/oidc/authorize:
+    get:
+      tags:
+      - auth
+      summary: Oidc:Database.Authorize
+      operationId: auth-oidc:database.authorize
+      parameters:
+      - name: scopes
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+          title: Scopes
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuth2AuthorizeResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /auth/oidc/callback:
+    get:
+      tags:
+      - auth
+      summary: Oidc:Database.Callback
+      description: The response varies based on the authentication backend used.
+      operationId: auth-oidc:database.callback
+      parameters:
+      - name: code
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Code
+      - name: code_verifier
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Code Verifier
+      - name: state
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: State
+      - name: error
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '400':
+          content:
+            application/json:
+              examples:
+                INVALID_STATE_TOKEN:
+                  summary: Invalid state token.
+                LOGIN_BAD_CREDENTIALS:
+                  summary: User is inactive.
+                  value:
+                    detail: LOGIN_BAD_CREDENTIALS
+              schema:
+                $ref: '#/components/schemas/ErrorModel'
+          description: Bad Request
+        '422':
+          description: Validation Error
           content:
             application/json:
               schema:
@@ -6430,6 +6562,36 @@ components:
       type: object
       title: OAuthSettingsUpdate
       description: Settings for OAuth authentication.
+    OIDCSettingsRead:
+      properties:
+        oidc_enabled:
+          type: boolean
+          title: Oidc Enabled
+        oidc_discovery_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Oidc Discovery Url
+      type: object
+      required:
+      - oidc_enabled
+      title: OIDCSettingsRead
+      description: Settings for OpenID Connect authentication.
+    OIDCSettingsUpdate:
+      properties:
+        oidc_enabled:
+          type: boolean
+          title: Oidc Enabled
+          description: Whether OIDC is enabled.
+          default: false
+        oidc_discovery_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Oidc Discovery Url
+      type: object
+      title: OIDCSettingsUpdate
+      description: Settings for OpenID Connect authentication.
     OrgMemberRead:
       properties:
         user_id:
