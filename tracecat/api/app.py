@@ -227,13 +227,34 @@ def get_oidc_oauth_router(
                 error=error,
             )
         except OAuth2AuthorizeCallbackError as e:
-            logger.error("OIDC token exchange failed", exc=e)
+            log_data = {
+                "exc": e,
+                "detail": e.detail,
+                "status_code": e.status_code,
+            }
+            if error:
+                log_data["error"] = error
+            if e.response is not None:
+                log_data["provider_status"] = e.response.status_code
+                try:
+                    log_data["provider_response"] = e.response.json()
+                except Exception:
+                    log_data["provider_response"] = e.response.text
+            logger.error("OIDC token exchange failed", **log_data)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Failed to complete OIDC login. Check provider configuration.",
             ) from e
         except Exception as e:  # pragma: no cover - unexpected errors
-            logger.error("OIDC token exchange unexpected error", exc=e)
+            log_data = {"exc": e}
+            if getattr(e, "response", None) is not None:
+                resp = e.response
+                log_data["provider_status"] = resp.status_code
+                try:
+                    log_data["provider_response"] = resp.json()
+                except Exception:
+                    log_data["provider_response"] = resp.text
+            logger.error("OIDC token exchange unexpected error", **log_data)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Failed to complete OIDC login. Check provider configuration.",
@@ -244,7 +265,15 @@ def get_oidc_oauth_router(
                 token["access_token"]
             )
         except Exception as e:
-            logger.error("OIDC provider user info retrieval failed", exc=e)
+            log_data = {"exc": e}
+            if getattr(e, "response", None) is not None:
+                resp = e.response
+                log_data["provider_status"] = resp.status_code
+                try:
+                    log_data["provider_response"] = resp.json()
+                except Exception:
+                    log_data["provider_response"] = resp.text
+            logger.error("OIDC provider user info retrieval failed", **log_data)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Failed to complete OIDC login. Check provider configuration.",
