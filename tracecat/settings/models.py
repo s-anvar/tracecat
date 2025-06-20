@@ -101,6 +101,22 @@ class OAuthSettingsUpdate(BaseSettingsGroup):
     )
 
 
+class OIDCSettingsRead(BaseSettingsGroup):
+    """Settings for OpenID Connect authentication."""
+
+    oidc_enabled: bool
+    oidc_discovery_url: str | None = Field(default=None)
+
+
+class OIDCSettingsUpdate(BaseSettingsGroup):
+    """Settings for OpenID Connect authentication."""
+
+    oidc_enabled: bool = Field(
+        default=False, description="Whether OIDC is enabled."
+    )
+    oidc_discovery_url: str | None = Field(default=None)
+
+
 class AppSettingsRead(BaseSettingsGroup):
     """Settings for the app."""
 
