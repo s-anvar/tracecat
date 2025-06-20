@@ -183,6 +183,11 @@ def get_oidc_oauth_router(
             state,
             scopes,
         )
+        logger.debug(
+            "OIDC authorization URL generated",
+            url=authorization_url,
+            client=oauth_client.name,
+        )
         return OAuth2AuthorizeResponse(authorization_url=authorization_url)
 
     @router.get(
@@ -236,6 +241,7 @@ def get_oidc_oauth_router(
                 log_data["error"] = error
             if e.response is not None:
                 log_data["provider_status"] = e.response.status_code
+                log_data["provider_url"] = str(e.response.url)
                 try:
                     log_data["provider_response"] = e.response.json()
                 except Exception:
@@ -250,6 +256,7 @@ def get_oidc_oauth_router(
             if getattr(e, "response", None) is not None:
                 resp = e.response
                 log_data["provider_status"] = resp.status_code
+                log_data["provider_url"] = str(resp.url)
                 try:
                     log_data["provider_response"] = resp.json()
                 except Exception:
@@ -269,6 +276,7 @@ def get_oidc_oauth_router(
             if getattr(e, "response", None) is not None:
                 resp = e.response
                 log_data["provider_status"] = resp.status_code
+                log_data["provider_url"] = str(resp.url)
                 try:
                     log_data["provider_response"] = resp.json()
                 except Exception:
@@ -287,8 +295,8 @@ def get_oidc_oauth_router(
 
         try:
             decode_jwt(state_value, state_secret, [STATE_TOKEN_AUDIENCE])
-        except jwt.DecodeError:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST)
+        except jwt.DecodeError as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST) from e
 
         try:
             user = await user_manager.oauth_callback(
@@ -302,11 +310,11 @@ def get_oidc_oauth_router(
                 associate_by_email=associate_by_email,
                 is_verified_by_default=is_verified_by_default,
             )
-        except UserAlreadyExists:
+        except UserAlreadyExists as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=ErrorCode.OAUTH_USER_ALREADY_EXISTS,
-            )
+            ) from e
 
         if not user.is_active:
             raise HTTPException(
