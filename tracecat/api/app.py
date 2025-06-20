@@ -238,8 +238,8 @@ def create_app(**kwargs) -> FastAPI:
     )
     if config.OIDC_DISCOVERY_URL:
         oidc_client = OpenID(
-            client_id=config.OAUTH_CLIENT_ID,
-            client_secret=config.OAUTH_CLIENT_SECRET,
+            client_id=config.OIDC_CLIENT_ID,
+            client_secret=config.OIDC_CLIENT_SECRET,
             openid_configuration_endpoint=config.OIDC_DISCOVERY_URL,
         )
         oidc_redirect_url = f"{config.TRACECAT__PUBLIC_APP_URL}/auth/oidc/callback"
