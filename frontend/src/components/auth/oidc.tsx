@@ -12,7 +12,13 @@ export function OidcSSOButton(props: OidcButtonProps) {
   const handleClick = async () => {
     try {
       setIsLoading(true)
-      const resp = await fetch(buildUrl("/auth/oidc/authorize?scopes=openid,email,profile"))
+      const params = new URLSearchParams()
+      for (const scope of ["openid", "email", "profile"]) {
+        params.append("scopes", scope)
+      }
+      const resp = await fetch(
+        buildUrl(`/auth/oidc/authorize?${params.toString()}`)
+      )
       const { authorization_url } = await resp.json()
       window.location.href = authorization_url
     } catch (error) {
