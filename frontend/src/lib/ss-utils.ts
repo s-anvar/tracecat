@@ -1,5 +1,7 @@
+import { getBaseUrl } from "@/lib/api"
+
 export function buildUrl(path: string) {
-  const url = process.env.NEXT_SERVER_API_URL || "http://api:8000"
+  const url = getBaseUrl()
   if (path.startsWith("/")) {
     return `${url}${path}`
   }
