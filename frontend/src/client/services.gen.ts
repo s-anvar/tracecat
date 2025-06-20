@@ -2538,6 +2538,40 @@ export const settingsUpdateOauthSettings = (
 }
 
 /**
+ * Get Oidc Settings
+ * @returns OIDCSettingsRead Successful Response
+ * @throws ApiError
+ */
+export const settingsGetOidcSettings =
+  (): CancelablePromise<SettingsGetOidcSettingsResponse> => {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/settings/oidc",
+    })
+  }
+
+/**
+ * Update Oidc Settings
+ * @param data The data for the request.
+ * @param data.requestBody
+ * @returns void Successful Response
+ * @throws ApiError
+ */
+export const settingsUpdateOidcSettings = (
+  data: SettingsUpdateOidcSettingsData
+): CancelablePromise<SettingsUpdateOidcSettingsResponse> => {
+  return __request(OpenAPI, {
+    method: "PATCH",
+    url: "/settings/oidc",
+    body: data.requestBody,
+    mediaType: "application/json",
+    errors: {
+      422: "Validation Error",
+    },
+  })
+}
+
+/**
  * Get App Settings
  * @returns AppSettingsRead Successful Response
  * @throws ApiError
