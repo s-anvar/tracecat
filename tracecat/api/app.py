@@ -316,13 +316,19 @@ class AppInfo(BaseModel):
     auth_basic_enabled: bool
     oauth_google_enabled: bool
     saml_enabled: bool
+    oidc_enabled: bool
 
 
 @app.get("/info", include_in_schema=False)
 async def info(session: AsyncDBSession) -> AppInfo:
     """Non-sensitive information about the platform, for frontend configuration."""
 
-    keys = {"auth_basic_enabled", "oauth_google_enabled", "saml_enabled"}
+    keys = {
+        "auth_basic_enabled",
+        "oauth_google_enabled",
+        "saml_enabled",
+        "oidc_enabled",
+    }
 
     service = SettingsService(session, role=bootstrap_role())
     settings = await service.list_org_settings(keys=keys)
@@ -336,6 +342,7 @@ async def info(session: AsyncDBSession) -> AppInfo:
         auth_basic_enabled=keyvalues["auth_basic_enabled"],
         oauth_google_enabled=keyvalues["oauth_google_enabled"],
         saml_enabled=keyvalues["saml_enabled"],
+        oidc_enabled=keyvalues["oidc_enabled"],
     )
 
 

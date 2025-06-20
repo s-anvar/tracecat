@@ -32,6 +32,7 @@ import { Input } from "@/components/ui/input"
 import { toast } from "@/components/ui/use-toast"
 import { GoogleOAuthButton } from "@/components/auth/oauth-buttons"
 import { SamlSSOButton } from "@/components/auth/saml"
+import { OidcSSOButton } from "@/components/auth/oidc"
 import { Icons } from "@/components/icons"
 import { CenteredSpinner } from "@/components/loading/spinner"
 
@@ -57,6 +58,8 @@ export function SignIn({ className }: React.HTMLProps<HTMLDivElement>) {
     allowedAuthTypes.includes("google_oauth") && appInfo?.oauth_google_enabled
   const showSamlAuth =
     allowedAuthTypes.includes("saml") && appInfo?.saml_enabled
+  const showOidcAuth =
+    allowedAuthTypes.includes("oidc") && appInfo?.oidc_enabled
   return (
     <div
       className={cn(
@@ -74,7 +77,7 @@ export function SignIn({ className }: React.HTMLProps<HTMLDivElement>) {
         </CardHeader>
         <CardContent className="flex-col space-y-2">
           {showBasicAuth && <BasicLoginForm />}
-          {showBasicAuth && (showGoogleOauthAuth || showSamlAuth) && (
+          {showBasicAuth && (showGoogleOauthAuth || showSamlAuth || showOidcAuth) && (
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
@@ -88,6 +91,7 @@ export function SignIn({ className }: React.HTMLProps<HTMLDivElement>) {
           )}
           {showGoogleOauthAuth && <GoogleOAuthButton className="w-full" />}
           {showSamlAuth && <SamlSSOButton className="w-full" />}
+          {showOidcAuth && <OidcSSOButton className="w-full" />}
           {/* <GithubOAuthButton disabled className="hover:cur" /> */}
         </CardContent>
         {showBasicAuth && (
