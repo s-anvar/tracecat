@@ -23,6 +23,8 @@ import { AlertNotification } from "@/components/notifications"
 const oidcFormSchema = z.object({
   oidc_enabled: z.boolean(),
   oidc_discovery_url: z.string().url().nullish(),
+  oidc_client_id: z.string().nullish(),
+  oidc_client_secret: z.string().nullish(),
 })
 
 type OidcFormValues = z.infer<typeof oidcFormSchema>
@@ -42,6 +44,8 @@ export function OrgSettingsOidcForm() {
     values: {
       oidc_enabled: oidcSettings?.oidc_enabled ?? false,
       oidc_discovery_url: oidcSettings?.oidc_discovery_url,
+      oidc_client_id: oidcSettings?.oidc_client_id,
+      oidc_client_secret: "",
     },
   })
 
@@ -49,6 +53,8 @@ export function OrgSettingsOidcForm() {
   const onSubmit = async (data: OidcFormValues) => {
     const conditional: Partial<OIDCSettingsUpdate> = {
       oidc_discovery_url: data.oidc_discovery_url ?? undefined,
+      oidc_client_id: data.oidc_client_id ?? undefined,
+      oidc_client_secret: data.oidc_client_secret || undefined,
     }
     if (isOidcAllowed) {
       conditional.oidc_enabled = data.oidc_enabled
@@ -56,6 +62,10 @@ export function OrgSettingsOidcForm() {
     try {
       await updateOidcSettings({
         requestBody: conditional,
+      })
+      form.reset({
+        ...data,
+        oidc_client_secret: "",
       })
     } catch {
       console.error("Failed to update oidc settings")
@@ -116,6 +126,37 @@ export function OrgSettingsOidcForm() {
               <FormDescription>
                 OIDC provider discovery endpoint.
               </FormDescription>
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="oidc_client_id"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Client ID</FormLabel>
+              <FormControl>
+                <Input placeholder="client-id" {...field} value={field.value ?? ""} />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="oidc_client_secret"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Client Secret</FormLabel>
+              <FormControl>
+                <Input
+                  type="password"
+                  placeholder={oidcSettings.oidc_client_secret_set ? "********" : "client secret"}
+                  {...field}
+                  value={field.value ?? ""}
+                />
+              </FormControl>
             </FormItem>
           )}
         />

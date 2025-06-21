@@ -54,6 +54,8 @@ class SettingsService(BaseService):
             raise KeyError("TRACECAT__DB_ENCRYPTION_KEY is not set") from e
 
     def _serialize_value_bytes(self, value: Any) -> bytes:
+        if isinstance(value, SecretStr):
+            value = value.get_secret_value()
         return orjson.dumps(
             value, default=to_jsonable_python, option=orjson.OPT_SORT_KEYS
         )

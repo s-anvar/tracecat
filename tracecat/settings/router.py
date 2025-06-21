@@ -182,10 +182,14 @@ async def get_oidc_settings(
     session: AsyncDBSession,
 ) -> OIDCSettingsRead:
     service = SettingsService(session, role)
-    keys = OIDCSettingsRead.keys()
+    keys = OIDCSettingsUpdate.keys()
     settings = await service.list_org_settings(keys=keys)
     settings_dict = {setting.key: service.get_value(setting) for setting in settings}
-    return OIDCSettingsRead(**settings_dict)
+    secret = settings_dict.pop("oidc_client_secret", None)
+    return OIDCSettingsRead(
+        **settings_dict,
+        oidc_client_secret_set=bool(secret)
+    )
 
 
 @router.patch("/oidc", status_code=status.HTTP_204_NO_CONTENT)
