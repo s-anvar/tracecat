@@ -6572,6 +6572,15 @@ components:
           - type: string
           - type: 'null'
           title: Oidc Discovery Url
+        oidc_client_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Oidc Client Id
+        oidc_client_secret_set:
+          type: boolean
+          title: Oidc Client Secret Set
+          readOnly: true
       type: object
       required:
       - oidc_enabled
@@ -6589,6 +6598,18 @@ components:
           - type: string
           - type: 'null'
           title: Oidc Discovery Url
+        oidc_client_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Oidc Client Id
+        oidc_client_secret:
+          anyOf:
+          - type: string
+          - type: 'null'
+          format: password
+          title: Oidc Client Secret
+          writeOnly: true
       type: object
       title: OIDCSettingsUpdate
       description: Settings for OpenID Connect authentication.
