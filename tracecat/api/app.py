@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from typing import Any
 
 import jwt
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, status
@@ -41,6 +42,7 @@ from tracecat.api.common import (
 from tracecat.auth.dependencies import require_auth_type_enabled
 from tracecat.auth.enums import AuthType
 from tracecat.auth.models import UserCreate, UserRead, UserUpdate
+from tracecat.auth.oidc import OIDCRoleAssignmentError, assign_role_from_oidc_token
 from tracecat.auth.router import router as users_router
 from tracecat.auth.saml import router as saml_router
 from tracecat.auth.users import (
@@ -461,6 +463,40 @@ def get_oidc_oauth_router(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Login failed, please try again.",
             ) from e
+
+        # --- OIDC role assignment ---
+        decoded_token: dict[str, Any] = {}
+        id_token = token.get("id_token")
+        if id_token:
+            try:
+                decoded_token = jwt.decode(id_token, options={"verify_signature": False})
+            except Exception as e:  # pragma: no cover - unexpected token errors
+                logger.warning(
+                    "Failed to decode OIDC id_token",
+                    event="oidc_id_token_decode_failed",
+                    sub=account_id,
+                    client_id=oauth_client.client_id,
+                    issuer=oauth_client.openid_configuration.get("issuer"),
+                    request_id=request_id,
+                    exc=e,
+                )
+        if decoded_token:
+            try:
+                new_role = assign_role_from_oidc_token(decoded_token)
+            except OIDCRoleAssignmentError as e:
+                logger.error(
+                    "OIDC role assignment failed",
+                    event="oidc_login_rejected",
+                    sub=account_id,
+                    client_id=oauth_client.client_id,
+                    issuer=oauth_client.openid_configuration.get("issuer"),
+                    request_id=request_id,
+                    reason=str(e),
+                )
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Login failed") from e
+            else:
+                if new_role and new_role != user.role:
+                    await user_manager.update(UserUpdate(role=new_role), user=user)
 
         if not user.is_active:
             logger.error(
