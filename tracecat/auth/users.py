@@ -412,28 +412,6 @@ def is_unprivileged(user: User) -> bool:
     return user.role != UserRole.ADMIN and not user.is_superuser
 
 
-ROLE_PRIORITY = {
-    UserRole.BASIC: 0,
-    UserRole.ADMIN: 1,
-}
-
-
-def resolve_oidc_role(groups: Iterable[str]) -> UserRole | None:
-    """Resolve user role from OIDC groups."""
-    best_role: UserRole | None = None
-    best_score = -1
-    for group in groups:
-        role = config.OIDC_GROUP_ROLE_MAP.get(group)
-        if role is not None:
-            score = ROLE_PRIORITY.get(role, 0)
-            if score > best_score:
-                best_score = score
-                best_role = role
-    if best_role is not None:
-        return best_role
-    return config.OIDC_DEFAULT_ROLE
-
-
 async def get_or_create_user(params: UserCreate, exist_ok: bool = True) -> User:
     async with get_async_session_context_manager() as session:
         async with get_user_db_context(session) as user_db:
