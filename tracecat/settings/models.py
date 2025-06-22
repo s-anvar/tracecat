@@ -112,7 +112,7 @@ class OIDCSettingsUpdate(BaseSettingsGroup):
     """Settings for OpenID Connect authentication."""
 
     oidc_enabled: bool = Field(
-        default=False, description="Whether OIDC is enabled."
+        default=True, description="Whether OIDC is enabled."
     )
     oidc_discovery_url: str | None = Field(default=None)
 

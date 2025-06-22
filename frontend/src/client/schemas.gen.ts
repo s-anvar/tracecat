@@ -3545,7 +3545,7 @@ export const $OIDCSettingsUpdate = {
       type: "boolean",
       title: "Oidc Enabled",
       description: "Whether OIDC is enabled.",
-      default: false,
+      default: true,
     },
     oidc_discovery_url: {
       anyOf: [{ type: "string" }, { type: "null" }],
