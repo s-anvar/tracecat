@@ -48,6 +48,7 @@ from tracecat.auth.users import (
     InvalidEmailException,
     auth_backend,
     fastapi_users,
+    resolve_oidc_role,
 )
 from tracecat.cases.router import case_fields_router as case_fields_router
 from tracecat.cases.router import cases_router as cases_router
@@ -315,6 +316,42 @@ def get_oidc_oauth_router(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=ErrorCode.OAUTH_USER_ALREADY_EXISTS,
             ) from e
+
+        try:
+            profile = await oauth_client.get_profile(token["access_token"])
+        except Exception as e:
+            log_data = {"exc": e}
+            if getattr(e, "response", None) is not None:
+                resp = e.response
+                log_data["provider_status"] = resp.status_code
+                log_data["provider_url"] = str(resp.url)
+                try:
+                    log_data["provider_response"] = resp.json()
+                except Exception:
+                    log_data["provider_response"] = resp.text
+            logger.error("OIDC provider profile retrieval failed", **log_data)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to complete OIDC login. Check provider configuration.",
+            ) from e
+
+        groups_claim = profile.get("groups") or []
+        if isinstance(groups_claim, str):
+            groups_claim = [groups_claim]
+        role = resolve_oidc_role(groups_claim)
+        if role is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User not allowed",
+            )
+        try:
+            await user_manager.user_db.update(user, update_dict={"role": role})
+        except Exception as e:  # pragma: no cover - ignore role update failures
+            logger.warning(
+                "Failed to update user role from OIDC groups",
+                user_id=user.id,
+                error=e,
+            )
 
         if not user.is_active:
             raise HTTPException(
