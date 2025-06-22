@@ -114,9 +114,6 @@ OAUTH_CLIENT_SECRET = (
 OIDC_CLIENT_ID = os.environ.get("OIDC_CLIENT_ID", "")
 OIDC_CLIENT_SECRET = os.environ.get("OIDC_CLIENT_SECRET", "")
 OIDC_DISCOVERY_URL = os.environ.get("OIDC_DISCOVERY_URL")
-OIDC_GROUP_ROLE_MAP = os.environ.get("OIDC_GROUP_ROLE_MAP")
-OIDC_DEFAULT_ROLE = os.environ.get("OIDC_DEFAULT_ROLE")
-OIDC_STRICT_MODE = os.environ.get("OIDC_STRICT_MODE", "false").lower() == "true"
 USER_AUTH_SECRET = os.environ.get("USER_AUTH_SECRET", "")
 
 # SAML SSO

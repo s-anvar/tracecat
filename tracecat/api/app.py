@@ -41,7 +41,6 @@ from tracecat.api.common import (
 from tracecat.auth.dependencies import require_auth_type_enabled
 from tracecat.auth.enums import AuthType
 from tracecat.auth.models import UserCreate, UserRead, UserUpdate
-from tracecat.auth.oidc import OIDCGroupRoleError, determine_oidc_role
 from tracecat.auth.router import router as users_router
 from tracecat.auth.saml import router as saml_router
 from tracecat.auth.users import (
@@ -476,44 +475,6 @@ def get_oidc_oauth_router(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Login failed, please try again.",
             )
-
-        id_token_raw = token.get("id_token")
-        try:
-            decoded_token = (
-                jwt.decode(id_token_raw, options={"verify_signature": False})
-                if id_token_raw
-                else {}
-            )
-        except Exception:  # pragma: no cover - unexpected decode errors
-            logger.error(
-                "Failed to decode OIDC ID token",
-                event="oidc_signin_failed",
-                sub=account_id,
-                client_id=oauth_client.client_id,
-                request_id=request_id,
-            )
-            decoded_token = {}
-
-        try:
-            role = determine_oidc_role(decoded_token)
-        except OIDCGroupRoleError as e:
-            logger.error(
-                "OIDC role mapping failed",
-                event="oidc_signin_failed",
-                sub=decoded_token.get("sub"),
-                groups=decoded_token.get("groups"),
-                reason=str(e),
-                client_id=oauth_client.client_id,
-                request_id=request_id,
-            )
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Login failed, please try again.",
-            ) from e
-
-        if user.role != role:
-            await user_manager.admin_update(UserUpdate(role=role), user)
-            user.role = role
 
         response = await backend.login(strategy, user)
         await user_manager.on_after_login(user, request, response)

@@ -24,19 +24,8 @@ TRACECAT__AUTH_TYPES=oidc
     - `OIDC_CLIENT_ID`
     - `OIDC_CLIENT_SECRET`
     - `OIDC_DISCOVERY_URL`
-    - `OIDC_GROUP_ROLE_MAP`
-    - `OIDC_DEFAULT_ROLE`
-    - `OIDC_STRICT_MODE`
   </Step>
   <Step title="Restart Tracecat">
     Run `docker compose up`.
-  </Step>
-  <Step title="Map provider groups to Tracecat roles">
-    Example mapping:
-    ```bash
-    OIDC_GROUP_ROLE_MAP='{"admins":"ADMIN","users":"BASIC"}'
-    OIDC_DEFAULT_ROLE=BASIC
-    OIDC_STRICT_MODE=true
-    ```
   </Step>
 </Steps>
