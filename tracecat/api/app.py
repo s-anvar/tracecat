@@ -176,12 +176,30 @@ def get_oidc_oauth_router(
     async def authorize(
         request: Request, scopes: list[str] = Query(None)
     ) -> OAuth2AuthorizeResponse:
+        request_id = request.headers.get("X-Request-ID")
+        logger.info(
+            "OIDC login flow started",
+            event="oidc_login_started",
+            client_id=oauth_client.client_id,
+            issuer=oauth_client.openid_configuration.get("issuer"),
+            scopes=scopes,
+            request_id=request_id,
+        )
+
         state_data: dict[str, str] = {}
         state = generate_state_token(state_data, state_secret)
         authorization_url = await oauth_client.get_authorization_url(
             redirect_url,
             state,
             scopes,
+        )
+        logger.info(
+            "Redirecting user to the Identity Provider",
+            event="oidc_redirect_to_idp",
+            client_id=oauth_client.client_id,
+            issuer=oauth_client.openid_configuration.get("issuer"),
+            scopes=scopes,
+            request_id=request_id,
         )
         logger.debug(
             "OIDC authorization URL generated",
@@ -223,6 +241,25 @@ def get_oidc_oauth_router(
         user_manager: BaseUserManager[models.UP, models.ID] = Depends(get_user_manager),
         strategy: Strategy[models.UP, models.ID] = Depends(backend.get_strategy),
     ):
+        request_id = request.headers.get("X-Request-ID")
+        logger.info(
+            "Callback received from IdP",
+            event="oidc_callback_received",
+            client_id=oauth_client.client_id,
+            issuer=oauth_client.openid_configuration.get("issuer"),
+            request_id=request_id,
+        )
+        if code:
+            logger.info(
+                "Authorization code received",
+                event="oidc_authorization_code_received",
+                request_id=request_id,
+            )
+        logger.info(
+            "Token exchange initiated",
+            event="oidc_token_exchange_started",
+            request_id=request_id,
+        )
         try:
             token, state_value = await oauth2_authorize_callback(
                 request=request,
@@ -230,6 +267,11 @@ def get_oidc_oauth_router(
                 code_verifier=code_verifier,
                 state=state,
                 error=error,
+            )
+            logger.info(
+                "Token exchange succeeded",
+                event="oidc_token_exchange_succeeded",
+                request_id=request_id,
             )
         except OAuth2AuthorizeCallbackError as e:
             log_data = {
@@ -246,6 +288,8 @@ def get_oidc_oauth_router(
                     log_data["provider_response"] = e.response.json()
                 except Exception:
                     log_data["provider_response"] = e.response.text
+            log_data["event"] = "oidc_token_exchange_failed"
+            log_data["request_id"] = request_id
             logger.error("OIDC token exchange failed", **log_data)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -261,6 +305,8 @@ def get_oidc_oauth_router(
                     log_data["provider_response"] = resp.json()
                 except Exception:
                     log_data["provider_response"] = resp.text
+            log_data["event"] = "oidc_token_exchange_failed"
+            log_data["request_id"] = request_id
             logger.error("OIDC token exchange unexpected error", **log_data)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -281,6 +327,8 @@ def get_oidc_oauth_router(
                     log_data["provider_response"] = resp.json()
                 except Exception:
                     log_data["provider_response"] = resp.text
+            log_data["event"] = "oidc_user_info_failed"
+            log_data["request_id"] = request_id
             logger.error("OIDC provider user info retrieval failed", **log_data)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -288,6 +336,14 @@ def get_oidc_oauth_router(
             ) from e
 
         if account_email is None:
+            logger.error(
+                "OIDC sign-in failed: email missing",
+                event="oidc_signin_failed",
+                sub=account_id,
+                client_id=oauth_client.client_id,
+                issuer=oauth_client.openid_configuration.get("issuer"),
+                request_id=request_id,
+            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=ErrorCode.OAUTH_NOT_AVAILABLE_EMAIL,
@@ -296,6 +352,11 @@ def get_oidc_oauth_router(
         try:
             decode_jwt(state_value, state_secret, [STATE_TOKEN_AUDIENCE])
         except jwt.DecodeError as e:
+            logger.error(
+                "OIDC sign-in failed: state token invalid",
+                event="oidc_signin_failed",
+                request_id=request_id,
+            )
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST) from e
 
         try:
@@ -311,12 +372,26 @@ def get_oidc_oauth_router(
                 is_verified_by_default=is_verified_by_default,
             )
         except UserAlreadyExists as e:
+            logger.error(
+                "OIDC sign-in failed: user already exists",
+                event="oidc_signin_failed",
+                email=account_email,
+                sub=account_id,
+                request_id=request_id,
+            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=ErrorCode.OAUTH_USER_ALREADY_EXISTS,
             ) from e
 
         if not user.is_active:
+            logger.error(
+                "OIDC sign-in failed: inactive user",
+                event="oidc_signin_failed",
+                email=account_email,
+                sub=account_id,
+                request_id=request_id,
+            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=ErrorCode.LOGIN_BAD_CREDENTIALS,
@@ -324,6 +399,15 @@ def get_oidc_oauth_router(
 
         response = await backend.login(strategy, user)
         await user_manager.on_after_login(user, request, response)
+        logger.info(
+            "OIDC sign-in succeeded",
+            event="oidc_signin_succeeded",
+            email=account_email,
+            sub=account_id,
+            client_id=oauth_client.client_id,
+            issuer=oauth_client.openid_configuration.get("issuer"),
+            request_id=request_id,
+        )
         return response
 
     return router
