@@ -11,8 +11,8 @@ from tracecat.settings.constants import SENSITIVE_SETTINGS_KEYS
 from tracecat.settings.models import (
     AuthSettingsUpdate,
     GitSettingsUpdate,
-    OIDCSettingsUpdate,
     OAuthSettingsUpdate,
+    OIDCSettingsUpdate,
     SAMLSettingsUpdate,
     SettingCreate,
     SettingUpdate,
