@@ -6,10 +6,12 @@ icon: shield-keyhole
 
 ## Configuration
 
-Set `TRACECAT__AUTH_TYPES` to include `oidc`.
+OIDC is enabled by default alongside basic auth and Google OAuth.
+If you've overridden `TRACECAT__AUTH_TYPES`, ensure that `oidc`
+is included:
 
 ```bash
-TRACECAT__AUTH_TYPES=oidc
+TRACECAT__AUTH_TYPES=basic,google_oauth,oidc
 ```
 
 ## Instructions
@@ -24,6 +26,9 @@ TRACECAT__AUTH_TYPES=oidc
     - `OIDC_CLIENT_ID`
     - `OIDC_CLIENT_SECRET`
     - `OIDC_DISCOVERY_URL`
+    
+    The discovery URL usually looks like:
+    `https://<provider>/.well-known/openid-configuration`.
   </Step>
   <Step title="Restart Tracecat">
     Run `docker compose up`.
