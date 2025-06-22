@@ -25,10 +25,6 @@ TRACECAT__AUTH_TYPES=oidc
     - `OIDC_CLIENT_SECRET`
     - `OIDC_DISCOVERY_URL`
   </Step>
-  <Step title="Update settings in Tracecat">
-    You can also configure these values from the Organization Settings page or via the `/settings/oidc` API.
-    The API exposes a read-only `oidc_client_secret_set` field to indicate when a secret has been stored.
-  </Step>
   <Step title="Restart Tracecat">
     Run `docker compose up`.
   </Step>
