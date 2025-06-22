@@ -296,42 +296,6 @@ async def test_update_oidc_settings(
 
 
 @pytest.mark.anyio
-async def test_oidc_client_secret_encryption(
-    settings_service_with_defaults: SettingsService,
-) -> None:
-    """Client secret should be stored encrypted and indicator should be set."""
-    service = settings_service_with_defaults
-
-    secret = "supersecret"
-    test_params = OIDCSettingsUpdate(oidc_client_secret=secret)
-    await service.update_oidc_settings(test_params)
-
-    settings = await service.list_org_settings(keys=OIDCSettingsUpdate.keys())
-    by_key = {s.key: s for s in settings}
-    secret_setting = by_key["oidc_client_secret"]
-    assert secret_setting.is_encrypted is True
-    assert service.get_value(secret_setting) == secret
-
-
-@pytest.mark.anyio
-async def test_oidc_client_secret_set_flag(
-    settings_service_with_defaults: SettingsService,
-) -> None:
-    """oidc_client_secret_set should reflect presence of secret."""
-    service = settings_service_with_defaults
-
-    await service.update_oidc_settings(OIDCSettingsUpdate(oidc_client_secret="top"))
-    settings = await service.list_org_settings(keys=OIDCSettingsUpdate.keys())
-    data = {s.key: service.get_value(s) for s in settings}
-    secret = data.pop("oidc_client_secret")
-    assert secret == "top"
-
-    # simulate router behaviour
-    secret_set = bool(secret)
-    assert secret_set is True
-
-
-@pytest.mark.anyio
 async def test_get_setting_shorthand(
     settings_service: SettingsService,
     create_params: SettingCreate,

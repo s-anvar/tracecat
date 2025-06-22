@@ -1,7 +1,7 @@
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field, SecretStr, ValidationInfo, field_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 
 class BaseSettingsGroup(BaseModel):
@@ -106,8 +106,6 @@ class OIDCSettingsRead(BaseSettingsGroup):
 
     oidc_enabled: bool
     oidc_discovery_url: str | None = Field(default=None)
-    oidc_client_id: str | None = Field(default=None)
-    oidc_client_secret_set: bool = Field(default=False)
 
 
 class OIDCSettingsUpdate(BaseSettingsGroup):
@@ -117,8 +115,6 @@ class OIDCSettingsUpdate(BaseSettingsGroup):
         default=False, description="Whether OIDC is enabled."
     )
     oidc_discovery_url: str | None = Field(default=None)
-    oidc_client_id: str | None = Field(default=None)
-    oidc_client_secret: SecretStr | None = Field(default=None)
 
 
 class AppSettingsRead(BaseSettingsGroup):
