@@ -168,6 +168,12 @@ def get_oidc_oauth_router(
         redirect_url=redirect_url,
     )
 
+    def _maybe_exc(e: Exception | None) -> dict[str, Exception]:
+        """Return exc data only in development."""
+        if e is not None and config.TRACECAT__APP_ENV == "development":
+            return {"exc": e}
+        return {}
+
     @router.get(
         "/authorize",
         name=f"oauth:{oauth_client.name}.{backend.name}.authorize",
@@ -187,12 +193,37 @@ def get_oidc_oauth_router(
         )
 
         state_data: dict[str, str] = {}
-        state = generate_state_token(state_data, state_secret)
-        authorization_url = await oauth_client.get_authorization_url(
-            redirect_url,
-            state,
-            scopes,
-        )
+        try:
+            state = generate_state_token(state_data, state_secret)
+            authorization_url = await oauth_client.get_authorization_url(
+                redirect_url,
+                state,
+                scopes,
+            )
+        except Exception as e:  # pragma: no cover - network errors
+            log_data = {
+                "event": "oidc_redirect_to_idp_failed",
+                "client_id": oauth_client.client_id,
+                "issuer": oauth_client.openid_configuration.get("issuer"),
+                "scopes": scopes,
+                "request_id": request_id,
+                **_maybe_exc(e),
+            }
+            if getattr(e, "response", None) is not None:
+                resp = e.response
+                log_data["provider_status"] = resp.status_code
+                log_data["provider_url"] = str(resp.url)
+                try:
+                    data = resp.json()
+                    log_data["error_description"] = data.get("error_description")
+                except Exception:  # pragma: no cover - not JSON
+                    log_data["provider_response"] = resp.text
+            logger.error("Failed to create OIDC authorization URL", **log_data)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Login failed, please try again.",
+            ) from e
+
         logger.info(
             "Redirecting user to the Identity Provider",
             event="oidc_redirect_to_idp",
@@ -249,6 +280,32 @@ def get_oidc_oauth_router(
             issuer=oauth_client.openid_configuration.get("issuer"),
             request_id=request_id,
         )
+        if error is not None:
+            log_data = {
+                "event": "oidc_error_response",
+                "client_id": oauth_client.client_id,
+                "issuer": oauth_client.openid_configuration.get("issuer"),
+                "request_id": request_id,
+                "error": error,
+            }
+            logger.error("Error returned from IdP", **log_data)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Login failed, please try again.",
+            )
+
+        if not code or not state:
+            logger.error(
+                "OIDC callback missing parameters",
+                event="oidc_invalid_callback_parameters",
+                client_id=oauth_client.client_id,
+                issuer=oauth_client.openid_configuration.get("issuer"),
+                request_id=request_id,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Login failed, please try again.",
+            )
         if code:
             logger.info(
                 "Authorization code received",
@@ -275,9 +332,12 @@ def get_oidc_oauth_router(
             )
         except OAuth2AuthorizeCallbackError as e:
             log_data = {
-                "exc": e,
+                **_maybe_exc(e),
                 "detail": e.detail,
                 "status_code": e.status_code,
+                "client_id": oauth_client.client_id,
+                "issuer": oauth_client.openid_configuration.get("issuer"),
+                "request_id": request_id,
             }
             if error:
                 log_data["error"] = error
@@ -285,32 +345,41 @@ def get_oidc_oauth_router(
                 log_data["provider_status"] = e.response.status_code
                 log_data["provider_url"] = str(e.response.url)
                 try:
-                    log_data["provider_response"] = e.response.json()
+                    data = e.response.json()
+                    log_data["provider_response"] = data
+                    if isinstance(data, dict):
+                        log_data["error_description"] = data.get("error_description")
                 except Exception:
                     log_data["provider_response"] = e.response.text
             log_data["event"] = "oidc_token_exchange_failed"
-            log_data["request_id"] = request_id
             logger.error("OIDC token exchange failed", **log_data)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to complete OIDC login. Check provider configuration.",
+                detail="Login failed, please try again.",
             ) from e
         except Exception as e:  # pragma: no cover - unexpected errors
-            log_data = {"exc": e}
+            log_data = {
+                **_maybe_exc(e),
+                "client_id": oauth_client.client_id,
+                "issuer": oauth_client.openid_configuration.get("issuer"),
+                "request_id": request_id,
+            }
             if getattr(e, "response", None) is not None:
                 resp = e.response
                 log_data["provider_status"] = resp.status_code
                 log_data["provider_url"] = str(resp.url)
                 try:
-                    log_data["provider_response"] = resp.json()
+                    data = resp.json()
+                    log_data["provider_response"] = data
+                    if isinstance(data, dict):
+                        log_data["error_description"] = data.get("error_description")
                 except Exception:
                     log_data["provider_response"] = resp.text
             log_data["event"] = "oidc_token_exchange_failed"
-            log_data["request_id"] = request_id
             logger.error("OIDC token exchange unexpected error", **log_data)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to complete OIDC login. Check provider configuration.",
+                detail="Login failed, please try again.",
             ) from e
 
         try:
@@ -318,26 +387,33 @@ def get_oidc_oauth_router(
                 token["access_token"]
             )
         except Exception as e:
-            log_data = {"exc": e}
+            log_data = {
+                **_maybe_exc(e),
+                "client_id": oauth_client.client_id,
+                "issuer": oauth_client.openid_configuration.get("issuer"),
+                "request_id": request_id,
+            }
             if getattr(e, "response", None) is not None:
                 resp = e.response
                 log_data["provider_status"] = resp.status_code
                 log_data["provider_url"] = str(resp.url)
                 try:
-                    log_data["provider_response"] = resp.json()
+                    data = resp.json()
+                    log_data["provider_response"] = data
+                    if isinstance(data, dict):
+                        log_data["error_description"] = data.get("error_description")
                 except Exception:
                     log_data["provider_response"] = resp.text
             log_data["event"] = "oidc_user_info_failed"
-            log_data["request_id"] = request_id
             logger.error("OIDC provider user info retrieval failed", **log_data)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to complete OIDC login. Check provider configuration.",
+                detail="Login failed, please try again.",
             ) from e
 
-        if account_email is None:
+        if account_email is None or account_id is None:
             logger.error(
-                "OIDC sign-in failed: email missing",
+                "OIDC sign-in failed: required claims missing",
                 event="oidc_signin_failed",
                 sub=account_id,
                 client_id=oauth_client.client_id,
@@ -346,7 +422,7 @@ def get_oidc_oauth_router(
             )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=ErrorCode.OAUTH_NOT_AVAILABLE_EMAIL,
+                detail="Login failed, please try again.",
             )
 
         try:
@@ -356,6 +432,7 @@ def get_oidc_oauth_router(
                 "OIDC sign-in failed: state token invalid",
                 event="oidc_signin_failed",
                 request_id=request_id,
+                **_maybe_exc(e),
             )
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST) from e
 
@@ -378,10 +455,11 @@ def get_oidc_oauth_router(
                 email=account_email,
                 sub=account_id,
                 request_id=request_id,
+                **_maybe_exc(e),
             )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=ErrorCode.OAUTH_USER_ALREADY_EXISTS,
+                detail="Login failed, please try again.",
             ) from e
 
         if not user.is_active:
@@ -391,10 +469,11 @@ def get_oidc_oauth_router(
                 email=account_email,
                 sub=account_id,
                 request_id=request_id,
+                **_maybe_exc(None),
             )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=ErrorCode.LOGIN_BAD_CREDENTIALS,
+                detail="Login failed, please try again.",
             )
 
         response = await backend.login(strategy, user)
