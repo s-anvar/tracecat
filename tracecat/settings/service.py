@@ -352,12 +352,4 @@ def get_setting_override(key: str) -> Any | None:
         logger.debug(f"Setting override not supported: {key}")
         return None
 
-    env_key = f"TRACECAT__SETTING_OVERRIDE_{key.upper()}"
-    env_value = os.environ.get(env_key)
-    if env_value is not None:
-        return env_value
-
-    if key == "oidc_enabled" and config.AuthType.OIDC in config.TRACECAT__AUTH_TYPES:
-        return "true"
-
-    return None
+    return os.environ.get(f"TRACECAT__SETTING_OVERRIDE_{key.upper()}")
