@@ -2,9 +2,6 @@ import os
 import uuid
 from typing import Literal
 
-import orjson
-from tracecat.auth.models import UserRole
-
 from tracecat.auth.enums import AuthType
 
 # === Internal Services === #
@@ -117,27 +114,6 @@ OAUTH_CLIENT_SECRET = (
 OIDC_CLIENT_ID = os.environ.get("OIDC_CLIENT_ID", "")
 OIDC_CLIENT_SECRET = os.environ.get("OIDC_CLIENT_SECRET", "")
 OIDC_DISCOVERY_URL = os.environ.get("OIDC_DISCOVERY_URL")
-
-OIDC_GROUP_ROLE_MAP: dict[str, UserRole] = {}
-_oidc_group_role_map_raw = os.environ.get("OIDC_GROUP_ROLE_MAP")
-if _oidc_group_role_map_raw:
-    try:
-        _map = orjson.loads(_oidc_group_role_map_raw)
-        if isinstance(_map, dict):
-            for k, v in _map.items():
-                try:
-                    OIDC_GROUP_ROLE_MAP[str(k)] = UserRole(v)
-                except ValueError:
-                    continue
-    except orjson.JSONDecodeError:
-        pass
-
-_default_role_raw = os.environ.get("OIDC_DEFAULT_ROLE")
-try:
-    OIDC_DEFAULT_ROLE = UserRole(_default_role_raw) if _default_role_raw else None
-except ValueError:
-    OIDC_DEFAULT_ROLE = None
-
 USER_AUTH_SECRET = os.environ.get("USER_AUTH_SECRET", "")
 
 # SAML SSO
