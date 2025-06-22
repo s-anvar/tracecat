@@ -15,10 +15,10 @@ from tracecat.settings.models import (
     AuthSettingsUpdate,
     GitSettingsRead,
     GitSettingsUpdate,
-    OIDCSettingsRead,
-    OIDCSettingsUpdate,
     OAuthSettingsRead,
     OAuthSettingsUpdate,
+    OIDCSettingsRead,
+    OIDCSettingsUpdate,
     SAMLSettingsRead,
     SAMLSettingsUpdate,
 )
