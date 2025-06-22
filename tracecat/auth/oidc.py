@@ -22,9 +22,9 @@ def _parse_groups(groups_claim: Any) -> list[str]:
     if groups_claim is None:
         return []
     if isinstance(groups_claim, str):
-        return [groups_claim.strip()]
+        return [groups_claim]
     if isinstance(groups_claim, list | tuple | set):
-        return [str(g).strip() for g in groups_claim]
+        return [str(g) for g in groups_claim]
     return []
 
 
@@ -38,17 +38,15 @@ def determine_oidc_role(id_token: Mapping[str, Any]) -> UserRole:
 
     raw_map = os.getenv("OIDC_GROUP_ROLE_MAP", "{}")
     try:
-        parsed_map = json.loads(raw_map) if raw_map else {}
+        group_map = json.loads(raw_map) if raw_map else {}
     except json.JSONDecodeError:
-        logger.error("Invalid OIDC_GROUP_ROLE_MAP JSON", sub=sub, client_id=client_id)
-        parsed_map = {}
-
-    # Normalize mapping keys (lowercased and stripped)
-    group_map = {str(k).strip().lower(): v for k, v in parsed_map.items()}
+        logger.error(
+            "Invalid OIDC_GROUP_ROLE_MAP JSON", sub=sub, client_id=client_id
+        )
+        group_map = {}
 
     for group in groups:
-        normalized_group = group.lower()
-        role_name = group_map.get(normalized_group)
+        role_name = group_map.get(group)
         if role_name:
             role_enum = _ALLOWED_ROLES.get(str(role_name).upper())
             if role_enum:
