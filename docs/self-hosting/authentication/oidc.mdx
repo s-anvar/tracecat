@@ -1,7 +1,7 @@
 ---
 title: OpenID Connect
 description: Learn how to authenticate into Tracecat using OpenID Connect.
-icon: shield-keyhole
+icon: openid
 ---
 
 ## Configuration
@@ -14,6 +14,13 @@ is included:
 TRACECAT__AUTH_TYPES=basic,google_oauth,oidc
 ```
 
+- `OIDC_CLIENT_ID`
+- `OIDC_CLIENT_SECRET`
+- `OIDC_DISCOVERY_URL`
+
+The discovery URL usually looks like:
+`https://<provider>/.well-known/openid-configuration`
+
 ## Instructions
 
 <Steps>
@@ -22,13 +29,7 @@ TRACECAT__AUTH_TYPES=basic,google_oauth,oidc
     Set the redirect URL to `<your-domain>/auth/oidc/callback`.
   </Step>
   <Step title="Configure environment variables in Tracecat">
-    Set the following in your `.env` file:
-    - `OIDC_CLIENT_ID`
-    - `OIDC_CLIENT_SECRET`
-    - `OIDC_DISCOVERY_URL`
-    
-    The discovery URL usually looks like:
-    `https://<provider>/.well-known/openid-configuration`.
+    Fill in the environment variables documented above in your `.env` file.
   </Step>
   <Step title="Restart Tracecat">
     Run `docker compose up`.
