@@ -66,6 +66,12 @@ export function GoogleOAuthButton(props: OAuthButtonProps) {
 
 export function OidcOAuthButton(props: OAuthButtonProps) {
   const [isLoading, setIsLoading] = useState<boolean>(false)
+  const label =
+    process.env.NEXT_PUBLIC_OIDC_BUTTON_LABEL || "OpenID Connect"
+  const iconKey = process.env.NEXT_PUBLIC_OIDC_BUTTON_ICON || "openid"
+  const DynamicIcon =
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (Icons as Record<string, any>)[iconKey] || Icons.openid
   const handleClick = async () => {
     try {
       setIsLoading(true)
@@ -84,9 +90,9 @@ export function OidcOAuthButton(props: OAuthButtonProps) {
       {isLoading ? (
         <Icons.spinner className="mr-2 size-4 animate-spin" />
       ) : (
-        <Icons.openid className="mr-2 size-4" />
+        <DynamicIcon className="mr-2 size-4" />
       )}{" "}
-      OpenID Connect
+      {label}
     </Button>
   )
 }
