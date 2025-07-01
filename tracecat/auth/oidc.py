@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+import uuid
 from fastapi_users import models
 from fastapi_users.authentication import AuthenticationBackend, Strategy
 from fastapi_users.exceptions import UserAlreadyExists
@@ -15,6 +16,8 @@ from httpx_oauth.clients.openid import OpenID
 from fastapi_users.router.common import ErrorModel, ErrorCode
 
 from tracecat.logger import logger
+
+GENERIC_OIDC_ERROR = "Authentication failed. Please try again or contact support."
 
 
 def get_oidc_router(
@@ -36,7 +39,11 @@ def get_oidc_router(
         openid_client, redirect_url=redirect_url
     )
 
-    log = logger.bind(auth_flow="oidc")
+    log = logger.bind(
+        auth_flow="oidc",
+        client_id=openid_client.client_id,
+        issuer=openid_client.openid_configuration.get("issuer"),
+    )
 
     @router.get(
         "/authorize",
@@ -46,7 +53,8 @@ def get_oidc_router(
     async def authorize(
         request: Request, scopes: list[str] = Query(None)
     ) -> OAuth2AuthorizeResponse:
-        log.info("login_started")
+        req_log = log.bind(request_id=request.headers.get("X-Request-ID") or str(uuid.uuid4()))
+        req_log.info("login_started")
         try:
             state = generate_state_token({}, state_secret)
             authorization_url = await openid_client.get_authorization_url(
@@ -55,12 +63,16 @@ def get_oidc_router(
                 scopes,
             )
         except Exception as e:  # pragma: no cover - network failures
-            log.error("authorize_failed", error=str(e))
+            req_log.error(
+                "authorize_failed",
+                error=str(e),
+                exc_info=e,
+            )
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Authentication service unavailable",
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=GENERIC_OIDC_ERROR,
             ) from e
-        log.info("redirect_sent", redirect_url=authorization_url)
+        req_log.info("redirect_sent", redirect_url=authorization_url)
         return OAuth2AuthorizeResponse(authorization_url=authorization_url)
 
     @router.get(
@@ -96,27 +108,32 @@ def get_oidc_router(
         strategy: Strategy[models.UP, models.ID] = Depends(backend.get_strategy),
     ):
         token, state = access_token_state
-        log.info("callback_received", state=state)
+        req_log = log.bind(request_id=request.headers.get("X-Request-ID") or str(uuid.uuid4()))
+        req_log.info("callback_received", state=state)
         try:
             sub, email = await openid_client.get_id_email(token["access_token"])
-            log.info("userinfo_fetched", sub=sub, email=email)
+            req_log.info("userinfo_fetched", sub=sub, email=email)
         except Exception as e:  # pragma: no cover - network failures
-            log.error("userinfo_failed", error=str(e))
+            req_log.error("userinfo_failed", error=str(e), exc_info=e)
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="Authentication failed"
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=GENERIC_OIDC_ERROR,
             ) from e
 
         if email is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=ErrorCode.OAUTH_NOT_AVAILABLE_EMAIL,
+                detail=GENERIC_OIDC_ERROR,
             )
 
         try:
             decode_jwt(state, state_secret, [STATE_TOKEN_AUDIENCE])
-        except Exception:
-            log.error("invalid_state_token")
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            req_log.error("invalid_state_token", error=str(e))
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=GENERIC_OIDC_ERROR,
+            ) from e
 
         try:
             user = await user_manager.oauth_callback(
@@ -130,23 +147,30 @@ def get_oidc_router(
                 associate_by_email=associate_by_email,
                 is_verified_by_default=is_verified_by_default,
             )
-            log.info("token_exchanged", sub=sub, email=email)
-        except UserAlreadyExists:
-            log.error("user_exists", email=email)
+            req_log.info("token_exchanged", sub=sub, email=email)
+        except UserAlreadyExists as e:
+            req_log.error("user_exists", email=email)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=ErrorCode.OAUTH_USER_ALREADY_EXISTS,
-            )
+                detail=GENERIC_OIDC_ERROR,
+            ) from e
+        except Exception as e:
+            req_log.error("user_callback_failed", error=str(e), exc_info=e)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=GENERIC_OIDC_ERROR,
+            ) from e
 
         if not user.is_active:
-            log.error("inactive_user", email=email)
+            req_log.error("inactive_user", email=email)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=ErrorCode.LOGIN_BAD_CREDENTIALS,
+                detail=GENERIC_OIDC_ERROR,
             )
 
         response = await backend.login(strategy, user)
         await user_manager.on_after_login(user, request, response)
+        req_log.info("user_authenticated", sub=sub, email=email)
         return response
 
     return router
