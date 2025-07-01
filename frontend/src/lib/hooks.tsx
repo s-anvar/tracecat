@@ -199,6 +199,7 @@ interface AppInfo {
   auth_allowed_types: string[]
   auth_basic_enabled: boolean
   oauth_google_enabled: boolean
+  oidc_enabled: boolean
   saml_enabled: boolean
 }
 

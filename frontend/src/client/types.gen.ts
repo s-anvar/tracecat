@@ -4220,6 +4220,21 @@ export type AuthOauthGoogleDatabaseCallbackData = {
 
 export type AuthOauthGoogleDatabaseCallbackResponse = unknown
 
+export type AuthOidcDatabaseAuthorizeData = {
+  scopes?: Array<string>
+}
+
+export type AuthOidcDatabaseAuthorizeResponse = OAuth2AuthorizeResponse
+
+export type AuthOidcDatabaseCallbackData = {
+  code?: string | null
+  codeVerifier?: string | null
+  error?: string | null
+  state?: string | null
+}
+
+export type AuthOidcDatabaseCallbackResponse = unknown
+
 export type AuthSamlDatabaseLoginResponse = SAMLDatabaseLoginResponse
 
 export type AuthSsoAcsData = {
@@ -6439,6 +6454,25 @@ export type $OpenApiTs = {
         /**
          * Validation Error
          */
+        422: HTTPValidationError
+      }
+    }
+  }
+  "/auth/oidc/authorize": {
+    get: {
+      req: AuthOidcDatabaseAuthorizeData
+      res: {
+        200: OAuth2AuthorizeResponse
+        422: HTTPValidationError
+      }
+    }
+  }
+  "/auth/oidc/callback": {
+    get: {
+      req: AuthOidcDatabaseCallbackData
+      res: {
+        200: unknown
+        400: ErrorModel
         422: HTTPValidationError
       }
     }
