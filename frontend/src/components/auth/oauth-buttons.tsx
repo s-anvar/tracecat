@@ -84,7 +84,7 @@ export function OidcOAuthButton(props: OAuthButtonProps) {
       {isLoading ? (
         <Icons.spinner className="mr-2 size-4 animate-spin" />
       ) : (
-        <Icons.microsoft className="mr-2 size-4" />
+        <Icons.openid className="mr-2 size-4" />
       )}{" "}
       OpenID Connect
     </Button>
