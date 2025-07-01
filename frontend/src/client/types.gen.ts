@@ -1217,6 +1217,7 @@ export type OAuth2AuthorizeResponse = {
  */
 export type OAuthSettingsRead = {
   oauth_google_enabled: boolean
+  oidc_enabled: boolean
 }
 
 /**
@@ -1227,6 +1228,10 @@ export type OAuthSettingsUpdate = {
    * Whether OAuth is enabled.
    */
   oauth_google_enabled?: boolean
+  /**
+   * Whether OIDC authentication is enabled.
+   */
+  oidc_enabled?: boolean
 }
 
 export type OrgMemberRead = {
